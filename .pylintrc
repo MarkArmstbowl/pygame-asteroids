@@ -1,0 +1,7 @@
+[MAIN]
+extension-pkg-allow-list=pygame
+
+[DESIGN]
+# Game controller objects naturally keep several pieces of game state.
+max-attributes=20
+

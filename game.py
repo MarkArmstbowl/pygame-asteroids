@@ -1,0 +1,407 @@
+"""Main game loop and rules for Neon Asteroids."""
+
+import math
+import random
+
+import pygame
+
+from asteroid import Asteroid
+from bullet import Bullet
+from player import Player
+from settings import (
+    BACKGROUND_BOTTOM,
+    BACKGROUND_TOP,
+    CYAN,
+    DARK_PANEL,
+    FPS,
+    GAME_TITLE,
+    LEVELS,
+    LIGHT_BLUE,
+    ORANGE,
+    PLAYER_RADIUS,
+    PURPLE,
+    RED,
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
+    SHOT_DELAY,
+    STARTING_LIVES,
+    WHITE,
+)
+
+
+class Game:
+    """Manage input, levels, collisions, drawing, and game states."""
+
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode(
+            (SCREEN_WIDTH, SCREEN_HEIGHT)
+        )
+        pygame.display.set_caption(GAME_TITLE)
+        self.clock = pygame.time.Clock()
+        self.running = True
+
+        self.title_font = pygame.font.SysFont("arial", 72, bold=True)
+        self.heading_font = pygame.font.SysFont("arial", 34, bold=True)
+        self.body_font = pygame.font.SysFont("arial", 23)
+        self.small_font = pygame.font.SysFont("arial", 18)
+
+        self.background = self.make_background()
+        self.player = Player()
+        self.asteroids = []
+        self.bullets = []
+        self.state = "title"
+        self.paused = False
+        self.level_index = 0
+        self.level_message_timer = 0
+        self.score = 0
+        self.lives = STARTING_LIVES
+
+    def make_background(self):
+        """Create a reusable gradient background with random stars."""
+        background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+        # Draw the dark blue vertical gradient one row at a time.
+        for y_position in range(SCREEN_HEIGHT):
+            amount = y_position / SCREEN_HEIGHT
+            color = []
+            for index in range(3):
+                color_value = (
+                    BACKGROUND_TOP[index]
+                    + (BACKGROUND_BOTTOM[index] - BACKGROUND_TOP[index])
+                    * amount
+                )
+                color.append(round(color_value))
+            pygame.draw.line(
+                background,
+                tuple(color),
+                (0, y_position),
+                (SCREEN_WIDTH, y_position)
+            )
+
+        # Different star sizes make the background feel deeper.
+        random.seed(7)
+        for _ in range(150):
+            x_position = random.randrange(SCREEN_WIDTH)
+            y_position = random.randrange(SCREEN_HEIGHT)
+            radius = random.choice([1, 1, 1, 2])
+            brightness = random.randint(100, 220)
+            star_color = (brightness, brightness, brightness)
+            pygame.draw.circle(
+                background,
+                star_color,
+                (x_position, y_position),
+                radius
+            )
+        random.seed()
+
+        return background
+
+    def run(self):
+        """Run the game until the player closes the window."""
+        while self.running:
+            delta_time = min(self.clock.tick(FPS) / 1000, 0.05)
+            self.handle_events()
+            self.update(delta_time)
+            self.draw()
+
+        pygame.quit()
+
+    def handle_events(self):
+        """Handle window, menu, shooting, and pause events."""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.running = False
+                elif self.state == "title" and event.key == pygame.K_RETURN:
+                    self.start_game()
+                elif self.state in ("game_over", "win"):
+                    if event.key in (pygame.K_RETURN, pygame.K_r):
+                        self.start_game()
+                elif self.state == "playing":
+                    if event.key == pygame.K_p:
+                        self.paused = not self.paused
+                    elif event.key == pygame.K_SPACE and not self.paused:
+                        self.fire_bullet()
+
+    def start_game(self):
+        """Reset all game data and begin at level one."""
+        self.player = Player()
+        self.bullets = []
+        self.score = 0
+        self.lives = STARTING_LIVES
+        self.level_index = 0
+        self.paused = False
+        self.state = "playing"
+        self.start_level()
+
+    def start_level(self):
+        """Create the large asteroids for the current level."""
+        self.asteroids = []
+        self.bullets = []
+        level = LEVELS[self.level_index]
+
+        for _ in range(level["asteroids"]):
+            x_position, y_position = self.get_spawn_position()
+            speed = level["speed"] * random.uniform(0.85, 1.15)
+            asteroid = Asteroid(x_position, y_position, speed)
+            self.asteroids.append(asteroid)
+
+        self.player.reset_position()
+        self.level_message_timer = 2.0
+
+    def get_spawn_position(self):
+        """Choose a position safely away from the player's ship."""
+        while True:
+            x_position = random.randint(50, SCREEN_WIDTH - 50)
+            y_position = random.randint(50, SCREEN_HEIGHT - 50)
+            distance = math.hypot(
+                x_position - SCREEN_WIDTH / 2,
+                y_position - SCREEN_HEIGHT / 2
+            )
+            if distance > 210:
+                return x_position, y_position
+
+    def fire_bullet(self):
+        """Fire one bullet from the nose of the spaceship."""
+        if not self.player.can_shoot():
+            return
+
+        bullet_x, bullet_y = self.player.get_nose_position()
+        bullet = Bullet(
+            bullet_x,
+            bullet_y,
+            self.player.angle,
+            self.player.velocity_x,
+            self.player.velocity_y
+        )
+        self.bullets.append(bullet)
+        self.player.start_shot_cooldown(SHOT_DELAY)
+
+    def update(self, delta_time):
+        """Update moving objects and check the game rules."""
+        if self.state != "playing" or self.paused:
+            return
+
+        keys = pygame.key.get_pressed()
+        self.player.update(keys, delta_time)
+
+        for bullet in self.bullets:
+            bullet.update(delta_time)
+        self.bullets = [
+            bullet for bullet in self.bullets if bullet.is_alive()
+        ]
+
+        for asteroid in self.asteroids:
+            asteroid.update(delta_time)
+
+        self.check_bullet_collisions()
+        self.check_player_collisions()
+
+        self.level_message_timer = max(
+            0, self.level_message_timer - delta_time
+        )
+
+        if not self.asteroids and self.state == "playing":
+            self.finish_level()
+
+    def check_bullet_collisions(self):
+        """Destroy hit asteroids and add any smaller fragments."""
+        for bullet in self.bullets[:]:
+            for asteroid in self.asteroids[:]:
+                distance = math.hypot(
+                    bullet.x - asteroid.x,
+                    bullet.y - asteroid.y
+                )
+
+                if distance < asteroid.radius:
+                    self.bullets.remove(bullet)
+                    self.asteroids.remove(asteroid)
+                    self.asteroids.extend(asteroid.split())
+                    self.score += (4 - asteroid.size) * 100
+                    break
+
+    def check_player_collisions(self):
+        """Remove a life when the ship touches an asteroid."""
+        if self.player.invulnerable_timer > 0:
+            return
+
+        for asteroid in self.asteroids:
+            distance = math.hypot(
+                self.player.x - asteroid.x,
+                self.player.y - asteroid.y
+            )
+
+            if distance < PLAYER_RADIUS + asteroid.radius:
+                self.lives -= 1
+                if self.lives <= 0:
+                    self.state = "game_over"
+                else:
+                    self.player.reset_position()
+                break
+
+    def finish_level(self):
+        """Advance to the next level or show the victory screen."""
+        if self.level_index == len(LEVELS) - 1:
+            self.state = "win"
+        else:
+            self.level_index += 1
+            self.start_level()
+
+    def draw(self):
+        """Draw the current game screen."""
+        self.screen.blit(self.background, (0, 0))
+
+        if self.state == "title":
+            self.draw_title_screen()
+        elif self.state == "playing":
+            self.draw_playing_screen()
+        elif self.state == "game_over":
+            self.draw_playing_screen()
+            self.draw_end_screen("GAME OVER", RED)
+        elif self.state == "win":
+            self.draw_playing_screen()
+            self.draw_end_screen("SECTOR CLEARED", CYAN)
+
+        pygame.display.flip()
+
+    def draw_playing_screen(self):
+        """Draw all game objects and the heads-up display."""
+        for asteroid in self.asteroids:
+            asteroid.draw(self.screen)
+        for bullet in self.bullets:
+            bullet.draw(self.screen)
+        self.player.draw(self.screen)
+        self.draw_hud()
+
+        if self.level_message_timer > 0 and self.state == "playing":
+            level = LEVELS[self.level_index]
+            self.draw_centered_text(
+                "LEVEL " + str(self.level_index + 1),
+                self.heading_font,
+                CYAN,
+                SCREEN_HEIGHT / 2 - 24
+            )
+            self.draw_centered_text(
+                level["name"],
+                self.body_font,
+                WHITE,
+                SCREEN_HEIGHT / 2 + 18
+            )
+
+        if self.paused:
+            self.draw_overlay()
+            self.draw_centered_text(
+                "PAUSED", self.title_font, ORANGE, SCREEN_HEIGHT / 2 - 25
+            )
+            self.draw_centered_text(
+                "Press P to continue",
+                self.body_font,
+                WHITE,
+                SCREEN_HEIGHT / 2 + 45
+            )
+
+    def draw_hud(self):
+        """Draw score, level, lives, and the pause reminder."""
+        level_text = "LEVEL " + str(self.level_index + 1)
+        score_text = "SCORE  " + str(self.score).zfill(6)
+        lives_text = "LIVES  " + ("▲ " * self.lives)
+
+        self.draw_text(level_text, self.small_font, LIGHT_BLUE, 24, 20)
+        self.draw_text(score_text, self.small_font, WHITE, 24, 47)
+        self.draw_text(lives_text, self.small_font, CYAN, 24, 74)
+
+        pause_surface = self.small_font.render("P  PAUSE", True, LIGHT_BLUE)
+        self.screen.blit(
+            pause_surface,
+            (SCREEN_WIDTH - pause_surface.get_width() - 24, 20)
+        )
+
+    def draw_title_screen(self):
+        """Draw the title, feature summary, and controls."""
+        self.draw_centered_text(
+            "NEON", self.title_font, CYAN, 118
+        )
+        self.draw_centered_text(
+            "ASTEROIDS", self.title_font, WHITE, 190
+        )
+        self.draw_centered_text(
+            "THREE SECTORS. THREE LIVES. ONE WAY HOME.",
+            self.small_font,
+            PURPLE,
+            280
+        )
+
+        panel = pygame.Rect(230, 330, 540, 190)
+        pygame.draw.rect(self.screen, DARK_PANEL, panel, border_radius=12)
+        pygame.draw.rect(
+            self.screen, LIGHT_BLUE, panel, 2, border_radius=12
+        )
+
+        controls = [
+            "LEFT / RIGHT     Rotate ship",
+            "UP               Fire thruster",
+            "SPACE            Shoot",
+            "P                Pause game",
+        ]
+        for index, line in enumerate(controls):
+            self.draw_centered_text(
+                line,
+                self.body_font,
+                WHITE,
+                355 + index * 38
+            )
+
+        self.draw_centered_text(
+            "PRESS ENTER TO LAUNCH",
+            self.heading_font,
+            ORANGE,
+            590
+        )
+        self.draw_centered_text(
+            "ESC quits at any time",
+            self.small_font,
+            LIGHT_BLUE,
+            642
+        )
+
+    def draw_end_screen(self, message, color):
+        """Draw the game-over or victory message."""
+        self.draw_overlay()
+        self.draw_centered_text(
+            message, self.title_font, color, SCREEN_HEIGHT / 2 - 65
+        )
+        self.draw_centered_text(
+            "FINAL SCORE  " + str(self.score).zfill(6),
+            self.heading_font,
+            WHITE,
+            SCREEN_HEIGHT / 2 + 25
+        )
+        self.draw_centered_text(
+            "Press Enter or R to play again",
+            self.body_font,
+            LIGHT_BLUE,
+            SCREEN_HEIGHT / 2 + 85
+        )
+
+    def draw_overlay(self):
+        """Darken the game beneath a menu message."""
+        overlay = pygame.Surface(
+            (SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA
+        )
+        overlay.fill((3, 7, 18, 205))
+        self.screen.blit(overlay, (0, 0))
+
+    def draw_text(self, text, font, color, x_position, y_position):
+        """Draw text using its top-left position."""
+        text_surface = font.render(text, True, color)
+        self.screen.blit(text_surface, (x_position, y_position))
+
+    def draw_centered_text(self, text, font, color, y_position):
+        """Draw one line of text centered horizontally."""
+        text_surface = font.render(text, True, color)
+        x_position = (SCREEN_WIDTH - text_surface.get_width()) / 2
+        self.screen.blit(text_surface, (x_position, y_position))
