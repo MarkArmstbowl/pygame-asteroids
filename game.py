@@ -8,6 +8,7 @@ import pygame
 from asteroid import Asteroid
 from bullet import Bullet
 from player import Player
+from records import load_scores, save_score
 from settings import (
     BACKGROUND_BOTTOM,
     BACKGROUND_TOP,
@@ -35,16 +36,18 @@ class Game:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode(
-            (SCREEN_WIDTH, SCREEN_HEIGHT)
+            (SCREEN_WIDTH, SCREEN_HEIGHT),
+            pygame.SCALED
         )
         pygame.display.set_caption(GAME_TITLE)
         self.clock = pygame.time.Clock()
         self.running = True
 
-        self.title_font = pygame.font.SysFont("arial", 72, bold=True)
-        self.heading_font = pygame.font.SysFont("arial", 34, bold=True)
-        self.body_font = pygame.font.SysFont("arial", 23)
-        self.small_font = pygame.font.SysFont("arial", 18)
+        # Pygame's bundled font keeps text sizes consistent across devices.
+        self.title_font = self.make_font(100, bold=True)
+        self.heading_font = self.make_font(46, bold=True)
+        self.body_font = self.make_font(32)
+        self.small_font = self.make_font(25)
 
         self.background = self.make_background()
         self.player = Player()
@@ -56,6 +59,16 @@ class Game:
         self.level_message_timer = 0
         self.score = 0
         self.lives = STARTING_LIVES
+        self.control_mode = "classic"
+        self.high_scores = load_scores()
+        self.score_recorded = False
+        self.confirm_action = None
+
+    def make_font(self, size, bold=False):
+        """Create a font bundled with Pygame for consistent sizing."""
+        font = pygame.font.Font(None, size)
+        font.set_bold(bold)
+        return font
 
     def make_background(self):
         """Create a reusable gradient background with random stars."""
@@ -111,21 +124,80 @@ class Game:
         """Handle window, menu, shooting, and pause events."""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                self.running = False
+                if self.state == "playing":
+                    self.request_confirmation("quit")
+                else:
+                    self.running = False
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    self.running = False
-                elif self.state == "title" and event.key == pygame.K_RETURN:
-                    self.start_game()
+                if self.confirm_action is not None:
+                    self.handle_confirmation_key(event.key)
+                    continue
+
+                if self.state == "title":
+                    if event.key == pygame.K_RETURN:
+                        self.start_game()
+                    elif event.key == pygame.K_c:
+                        self.toggle_control_mode()
+                    elif event.key == pygame.K_ESCAPE:
+                        self.running = False
+
                 elif self.state in ("game_over", "win"):
                     if event.key in (pygame.K_RETURN, pygame.K_r):
                         self.start_game()
+                    elif event.key == pygame.K_m:
+                        self.return_to_menu()
+
                 elif self.state == "playing":
-                    if event.key == pygame.K_p:
+                    if event.key in (pygame.K_p, pygame.K_ESCAPE):
                         self.paused = not self.paused
+                    elif self.paused and event.key == pygame.K_m:
+                        self.request_confirmation("menu")
+                    elif self.paused and event.key == pygame.K_c:
+                        self.toggle_control_mode()
+                    elif self.paused and event.key == pygame.K_q:
+                        self.request_confirmation("quit")
                     elif event.key == pygame.K_SPACE and not self.paused:
                         self.fire_bullet()
+
+    def request_confirmation(self, action):
+        """Pause play and ask whether the score should be saved."""
+        self.paused = True
+        self.confirm_action = action
+
+    def handle_confirmation_key(self, key):
+        """Handle save, discard, or cancel from the confirmation dialog."""
+        if key == pygame.K_y:
+            self.record_current_score()
+            self.complete_confirmed_action()
+        elif key == pygame.K_n:
+            self.complete_confirmed_action()
+        elif key == pygame.K_ESCAPE:
+            self.confirm_action = None
+
+    def complete_confirmed_action(self):
+        """Continue to the menu or quit after a confirmation choice."""
+        action = self.confirm_action
+        self.confirm_action = None
+
+        if action == "menu":
+            self.return_to_menu()
+        elif action == "quit":
+            self.running = False
+
+    def toggle_control_mode(self):
+        """Switch between classic and screen-direction controls."""
+        if self.control_mode == "classic":
+            self.control_mode = "direct"
+        else:
+            self.control_mode = "classic"
+
+    def return_to_menu(self):
+        """Leave the current run and return to the title screen."""
+        self.state = "title"
+        self.paused = False
+        self.confirm_action = None
+        self.high_scores = load_scores()
 
     def start_game(self):
         """Reset all game data and begin at level one."""
@@ -136,6 +208,8 @@ class Game:
         self.level_index = 0
         self.paused = False
         self.state = "playing"
+        self.score_recorded = False
+        self.confirm_action = None
         self.start_level()
 
     def start_level(self):
@@ -187,7 +261,7 @@ class Game:
             return
 
         keys = pygame.key.get_pressed()
-        self.player.update(keys, delta_time)
+        self.player.update(keys, delta_time, self.control_mode)
 
         for bullet in self.bullets:
             bullet.update(delta_time)
@@ -239,6 +313,7 @@ class Game:
                 self.lives -= 1
                 if self.lives <= 0:
                     self.state = "game_over"
+                    self.record_current_score()
                 else:
                     self.player.reset_position()
                 break
@@ -247,9 +322,16 @@ class Game:
         """Advance to the next level or show the victory screen."""
         if self.level_index == len(LEVELS) - 1:
             self.state = "win"
+            self.record_current_score()
         else:
             self.level_index += 1
             self.start_level()
+
+    def record_current_score(self):
+        """Save one completed run to the local leaderboard."""
+        if not self.score_recorded:
+            self.high_scores = save_score(self.score)
+            self.score_recorded = True
 
     def draw(self):
         """Draw the current game screen."""
@@ -293,16 +375,9 @@ class Game:
             )
 
         if self.paused:
-            self.draw_overlay()
-            self.draw_centered_text(
-                "PAUSED", self.title_font, ORANGE, SCREEN_HEIGHT / 2 - 25
-            )
-            self.draw_centered_text(
-                "Press P to continue",
-                self.body_font,
-                WHITE,
-                SCREEN_HEIGHT / 2 + 45
-            )
+            self.draw_pause_screen()
+            if self.confirm_action is not None:
+                self.draw_confirmation_dialog()
 
     def draw_hud(self):
         """Draw score, level, lives, and the pause reminder."""
@@ -314,58 +389,135 @@ class Game:
         self.draw_text(score_text, self.small_font, WHITE, 24, 47)
         self.draw_text(lives_text, self.small_font, CYAN, 24, 74)
 
-        pause_surface = self.small_font.render("P  PAUSE", True, LIGHT_BLUE)
+        mode_text = "MODE  " + self.control_mode.upper()
+        mode_surface = self.small_font.render(mode_text, True, CYAN)
+        pause_surface = self.small_font.render(
+            "P / ESC  PAUSE", True, LIGHT_BLUE
+        )
+        right_edge = SCREEN_WIDTH - 24
+        self.screen.blit(
+            mode_surface,
+            (right_edge - mode_surface.get_width(), 20)
+        )
         self.screen.blit(
             pause_surface,
-            (SCREEN_WIDTH - pause_surface.get_width() - 24, 20)
+            (right_edge - pause_surface.get_width(), 47)
         )
 
     def draw_title_screen(self):
-        """Draw the title, feature summary, and controls."""
-        self.draw_centered_text(
-            "NEON", self.title_font, CYAN, 118
-        )
-        self.draw_centered_text(
-            "ASTEROIDS", self.title_font, WHITE, 190
-        )
+        """Draw the title, aligned controls, and local records."""
+        self.draw_centered_text("NEON", self.title_font, CYAN, 38)
+        self.draw_centered_text("ASTEROIDS", self.title_font, WHITE, 105)
         self.draw_centered_text(
             "THREE SECTORS. THREE LIVES. ONE WAY HOME.",
             self.small_font,
             PURPLE,
-            280
+            190
         )
 
-        panel = pygame.Rect(230, 330, 540, 190)
-        pygame.draw.rect(self.screen, DARK_PANEL, panel, border_radius=12)
-        pygame.draw.rect(
-            self.screen, LIGHT_BLUE, panel, 2, border_radius=12
+        control_panel = pygame.Rect(65, 235, 555, 305)
+        record_panel = pygame.Rect(645, 235, 290, 305)
+        self.draw_panel(control_panel)
+        self.draw_panel(record_panel)
+
+        mode_name = self.control_mode.upper() + " FLIGHT"
+        self.draw_panel_heading(
+            mode_name,
+            control_panel
         )
+        self.draw_control_rows(control_panel, control_panel.y + 80)
 
-        controls = [
-            "LEFT / RIGHT     Rotate ship",
-            "UP               Fire thruster",
-            "SPACE            Shoot",
-            "P                Pause game",
-        ]
-        for index, line in enumerate(controls):
-            self.draw_centered_text(
-                line,
-                self.body_font,
-                WHITE,
-                355 + index * 38
-            )
+        self.draw_panel_heading(
+            "TOP 5 RECORDS",
+            record_panel
+        )
+        self.draw_records(record_panel)
 
+        self.draw_centered_text(
+            "C  SWITCH CONTROL MODE",
+            self.small_font,
+            LIGHT_BLUE,
+            567
+        )
         self.draw_centered_text(
             "PRESS ENTER TO LAUNCH",
             self.heading_font,
             ORANGE,
-            590
+            607
         )
         self.draw_centered_text(
-            "ESC quits at any time",
+            "ESC quits from this menu",
             self.small_font,
             LIGHT_BLUE,
-            642
+            657
+        )
+
+    def draw_pause_screen(self):
+        """Show controls and navigation options over the paused game."""
+        self.draw_overlay()
+        self.draw_centered_text("PAUSED", self.title_font, ORANGE, 62)
+
+        panel = pygame.Rect(150, 145, 700, 450)
+        self.draw_panel(panel)
+        self.draw_centered_text(
+            self.control_mode.upper() + " FLIGHT CONTROLS",
+            self.heading_font,
+            CYAN,
+            175
+        )
+        self.draw_control_rows(panel, 235)
+
+        pygame.draw.line(
+            self.screen,
+            (65, 105, 135),
+            (panel.x + 35, 450),
+            (panel.right - 35, 450),
+            1
+        )
+        self.draw_centered_text(
+            "P / ESC  RESUME     C  SWITCH MODE",
+            self.body_font,
+            WHITE,
+            475
+        )
+        self.draw_centered_text(
+            "M  MAIN MENU     Q  QUIT",
+            self.body_font,
+            LIGHT_BLUE,
+            520
+        )
+
+    def draw_confirmation_dialog(self):
+        """Ask whether to save before leaving the current game."""
+        self.draw_overlay()
+        panel = pygame.Rect(220, 210, 560, 290)
+        self.draw_panel(panel)
+
+        if self.confirm_action == "menu":
+            action_text = "RETURN TO MAIN MENU?"
+        else:
+            action_text = "QUIT THE GAME?"
+
+        self.draw_centered_text(
+            action_text, self.heading_font, ORANGE, 242
+        )
+        self.draw_centered_text(
+            "CURRENT SCORE  " + str(self.score).zfill(6),
+            self.body_font,
+            WHITE,
+            315
+        )
+        self.draw_centered_text(
+            "SAVE THIS SCORE FIRST?",
+            self.body_font,
+            CYAN,
+            363
+        )
+        self.draw_centered_text(
+            "Y  SAVE     N  DON'T SAVE     ESC  CANCEL",
+            self.small_font,
+            LIGHT_BLUE,
+            430
         )
 
     def draw_end_screen(self, message, color):
@@ -386,6 +538,92 @@ class Game:
             LIGHT_BLUE,
             SCREEN_HEIGHT / 2 + 85
         )
+        self.draw_centered_text(
+            "Press M for the main menu",
+            self.small_font,
+            WHITE,
+            SCREEN_HEIGHT / 2 + 125
+        )
+
+    def get_control_rows(self):
+        """Return labels for the currently selected control mode."""
+        if self.control_mode == "direct":
+            return [
+                ("UP / W", "Move up"),
+                ("DOWN / S", "Move down"),
+                ("LEFT / A", "Move left"),
+                ("RIGHT / D", "Move right"),
+                ("SPACE", "Shoot"),
+                ("P / ESC", "Pause game"),
+            ]
+
+        return [
+            ("LEFT / A", "Rotate left"),
+            ("RIGHT / D", "Rotate right"),
+            ("UP / W", "Fire thruster"),
+            ("DOWN / S", "Brake"),
+            ("SPACE", "Shoot"),
+            ("P / ESC", "Pause game"),
+        ]
+
+    def draw_control_rows(self, panel, start_y):
+        """Draw control keys and actions in fixed, aligned columns."""
+        key_x = panel.x + 35
+        action_x = panel.x + 255
+
+        for index, (key_text, action_text) in enumerate(
+                self.get_control_rows()):
+            y_position = start_y + index * 36
+            self.draw_text(
+                key_text, self.body_font, LIGHT_BLUE, key_x, y_position
+            )
+            self.draw_text(
+                action_text, self.body_font, WHITE, action_x, y_position
+            )
+
+    def draw_records(self, panel):
+        """Draw up to five local high scores."""
+        if not self.high_scores:
+            self.draw_text(
+                "No completed runs yet",
+                self.small_font,
+                LIGHT_BLUE,
+                panel.x + 24,
+                panel.y + 96
+            )
+            return
+
+        for index, score in enumerate(self.high_scores):
+            place = str(index + 1) + "."
+            score_text = str(score).zfill(6)
+            y_position = panel.y + 90 + index * 39
+            self.draw_text(
+                place, self.body_font, LIGHT_BLUE, panel.x + 30, y_position
+            )
+            self.draw_text(
+                score_text, self.body_font, WHITE, panel.x + 95, y_position
+            )
+
+    def draw_panel(self, panel):
+        """Draw a reusable dark menu panel with a blue outline."""
+        pygame.draw.rect(self.screen, DARK_PANEL, panel, border_radius=12)
+        pygame.draw.rect(
+            self.screen, LIGHT_BLUE, panel, 2, border_radius=12
+        )
+
+    def draw_panel_heading(self, text, panel):
+        """Fit and center a heading inside a menu panel."""
+        font_size = 46
+        available_width = panel.width - 40
+        font = self.make_font(font_size, bold=True)
+
+        while font.size(text)[0] > available_width and font_size > 24:
+            font_size -= 2
+            font = self.make_font(font_size, bold=True)
+
+        text_surface = font.render(text, True, CYAN)
+        x_position = panel.centerx - text_surface.get_width() / 2
+        self.screen.blit(text_surface, (x_position, panel.y + 25))
 
     def draw_overlay(self):
         """Darken the game beneath a menu message."""

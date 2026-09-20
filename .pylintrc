@@ -3,5 +3,8 @@ extension-pkg-allow-list=pygame
 
 [DESIGN]
 # Game controller objects naturally keep several pieces of game state.
-max-attributes=20
-
+max-attributes=22
+# The Game class keeps its screen actions as small, readable methods.
+max-public-methods=40
+# Keyboard handling has one short branch for each visible menu action.
+max-branches=20

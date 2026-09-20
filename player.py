@@ -6,7 +6,9 @@ import pygame
 
 from settings import (
     CYAN,
+    DIRECT_TURN_SPEED,
     ORANGE,
+    PLAYER_BRAKE,
     PLAYER_DRAG,
     PLAYER_INVULNERABLE_TIME,
     PLAYER_MAX_SPEED,
@@ -40,22 +42,12 @@ class Player:
         self.angle = 0
         self.invulnerable_timer = PLAYER_INVULNERABLE_TIME
 
-    def update(self, keys, delta_time):
+    def update(self, keys, delta_time, control_mode="classic"):
         """Turn, accelerate, and move the spaceship."""
-        if keys[pygame.K_LEFT]:
-            self.angle -= PLAYER_TURN_SPEED * delta_time
-        if keys[pygame.K_RIGHT]:
-            self.angle += PLAYER_TURN_SPEED * delta_time
-
-        self.thrusting = keys[pygame.K_UP]
-        if self.thrusting:
-            angle_radians = math.radians(self.angle)
-            self.velocity_x += (
-                math.sin(angle_radians) * PLAYER_THRUST * delta_time
-            )
-            self.velocity_y -= (
-                math.cos(angle_radians) * PLAYER_THRUST * delta_time
-            )
+        if control_mode == "direct":
+            self.update_direct_controls(keys, delta_time)
+        else:
+            self.update_classic_controls(keys, delta_time)
 
         # Drag slows the ship gently when the engine is not accelerating it.
         drag = PLAYER_DRAG ** (delta_time * 60)
@@ -71,6 +63,74 @@ class Player:
         self.invulnerable_timer = max(
             0, self.invulnerable_timer - delta_time
         )
+
+    def update_classic_controls(self, keys, delta_time):
+        """Use arrows or WASD to rotate, thrust, and brake."""
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            self.angle -= PLAYER_TURN_SPEED * delta_time
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            self.angle += PLAYER_TURN_SPEED * delta_time
+
+        self.thrusting = keys[pygame.K_UP] or keys[pygame.K_w]
+        if self.thrusting:
+            angle_radians = math.radians(self.angle)
+            self.velocity_x += (
+                math.sin(angle_radians) * PLAYER_THRUST * delta_time
+            )
+            self.velocity_y -= (
+                math.cos(angle_radians) * PLAYER_THRUST * delta_time
+            )
+
+        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+            brake_amount = max(0, 1 - PLAYER_BRAKE * delta_time)
+            self.velocity_x *= brake_amount
+            self.velocity_y *= brake_amount
+
+    def update_direct_controls(self, keys, delta_time):
+        """Use WASD to point and move in screen directions."""
+        direction_x = 0
+        direction_y = 0
+
+        if keys[pygame.K_w] or keys[pygame.K_UP]:
+            direction_y -= 1
+        if keys[pygame.K_s] or keys[pygame.K_DOWN]:
+            direction_y += 1
+        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
+            direction_x -= 1
+        if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
+            direction_x += 1
+
+        self.thrusting = direction_x != 0 or direction_y != 0
+        if not self.thrusting:
+            return
+
+        # Normalize diagonal input so it is not faster than one direction.
+        direction_length = math.hypot(direction_x, direction_y)
+        direction_x /= direction_length
+        direction_y /= direction_length
+
+        target_angle = math.degrees(
+            math.atan2(direction_x, -direction_y)
+        )
+        self.turn_toward(target_angle, delta_time)
+
+        # Movement responds immediately while the ship turns to face it.
+        self.velocity_x += direction_x * PLAYER_THRUST * delta_time
+        self.velocity_y += direction_y * PLAYER_THRUST * delta_time
+
+    def turn_toward(self, target_angle, delta_time):
+        """Rotate toward a target using the shortest direction."""
+        difference = (target_angle - self.angle + 180) % 360 - 180
+        turn_amount = DIRECT_TURN_SPEED * delta_time
+
+        if abs(difference) <= turn_amount:
+            self.angle = target_angle
+        elif difference > 0:
+            self.angle += turn_amount
+        else:
+            self.angle -= turn_amount
+
+        self.angle %= 360
 
     def limit_speed(self):
         """Keep the spaceship from moving too quickly."""

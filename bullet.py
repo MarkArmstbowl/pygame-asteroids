@@ -30,17 +30,17 @@ class Bullet:
         self.life_remaining = BULLET_LIFETIME
 
     def update(self, delta_time):
-        """Move the bullet and reduce its remaining lifetime."""
+        """Move the bullet, wrap it, and reduce its remaining lifetime."""
         self.x += self.velocity_x * delta_time
         self.y += self.velocity_y * delta_time
         self.life_remaining -= delta_time
 
-        # Bullets wrap around the screen just like the spaceship.
+        # Classic Asteroids objects reappear at the opposite screen edge.
         self.x %= SCREEN_WIDTH
         self.y %= SCREEN_HEIGHT
 
     def is_alive(self):
-        """Return True until the bullet's lifetime ends."""
+        """Return True until the bullet's short lifetime ends."""
         return self.life_remaining > 0
 
     def draw(self, screen):

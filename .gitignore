@@ -16,3 +16,5 @@ env/
 .pytest_cache/
 .pylint.d/
 
+# Local player data
+records.json

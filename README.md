@@ -6,12 +6,13 @@ external art files are required.
 
 ## Features
 
-- Arrow-key spaceship controls with momentum and screen wrapping
+- Classic arrow-key controls and optional screen-direction WASD controls
 - Three levels with increasing asteroid counts and speeds
 - Five or more independently moving asteroids on screen
 - Large asteroids that split into medium and then small asteroids
 - Global score, three player lives, and temporary respawn protection
 - Victory, game-over, pause, and title screens
+- Pause-menu instructions, main-menu navigation, and local top-five scores
 - Real-time neon graphics, star field, and heads-up display
 
 ## Setup
@@ -32,12 +33,20 @@ python main.py
 
 | Key | Action |
 | --- | --- |
-| Left / Right arrow | Rotate the spaceship |
-| Up arrow | Fire the thruster |
+| Left/Right or A/D | Rotate in Classic mode |
+| Up or W | Fire the thruster in Classic mode |
+| Down or S | Brake in Classic mode |
+| Arrow keys or WASD | Move by screen direction in Direct mode |
 | Space | Shoot |
-| P | Pause or continue |
+| P / Escape | Pause or continue during a game |
+| C | Switch control mode on the title or pause screen |
+| M | Return to the main menu from pause or an end screen |
 | Enter | Start or restart |
-| Escape | Quit |
+| Escape | Quit from the title screen |
+
+Leaving an unfinished game through the pause menu opens a confirmation dialog.
+Press `Y` to save the current score, `N` to leave without saving, or `Escape`
+to cancel and remain paused.
 
 ## Project Structure
 
@@ -47,6 +56,7 @@ game.py       Runs the game loop, levels, collisions, and screens
 player.py     Controls spaceship movement and drawing
 asteroid.py   Controls asteroid movement, shapes, and splitting
 bullet.py     Controls fired projectiles
+records.py    Stores and retrieves local high scores
 settings.py   Stores shared game settings and level difficulty
 assets/       Reserved for future sound or image files
 ```
