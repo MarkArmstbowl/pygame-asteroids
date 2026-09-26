@@ -14,6 +14,8 @@ external art files are required.
 - Victory, game-over, pause, and title screens
 - Pause-menu instructions, main-menu navigation, and local top-five scores
 - Particle explosions, engine exhaust, and glowing bullet trails
+- Layered moving stars, impact flashes, and subtle screen shake
+- Animated level introductions and detailed end-of-run summaries
 - Real-time neon graphics, star field, and heads-up display
 
 ## Setup

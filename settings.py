@@ -5,10 +5,11 @@ SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 700
 FPS = 60
 GAME_TITLE = "Neon Asteroids"
+LEVEL_INTRO_TIME = 2.2
 
-# Testing shortcut: press V during a game to see the victory screen.
+# Testing shortcut: press V during a game to skip the current level.
 # Change this to False before submitting the final version.
-ENABLE_TEST_WIN = True
+ENABLE_TEST_LEVEL_SKIP = True
 
 # Colors
 BACKGROUND_TOP = (4, 8, 22)
@@ -22,6 +23,13 @@ RED = (255, 85, 105)
 DARK_PANEL = (9, 17, 38)
 ASTEROID_FILL = (26, 35, 58)
 ASTEROID_OUTLINE = (165, 195, 220)
+
+# Far stars move slowly, while brighter nearby stars move more quickly.
+STAR_LAYERS = [
+    {"count": 75, "speed": 5, "radius": 1, "brightness": (70, 125)},
+    {"count": 45, "speed": 12, "radius": 1, "brightness": (120, 185)},
+    {"count": 22, "speed": 24, "radius": 2, "brightness": (175, 235)},
+]
 
 # Player settings
 PLAYER_TURN_SPEED = 240
