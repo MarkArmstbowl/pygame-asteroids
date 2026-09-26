@@ -2,8 +2,9 @@
 extension-pkg-allow-list=pygame
 
 [DESIGN]
-# Game controller objects naturally keep several pieces of game state.
-max-attributes=22
+# Game controller objects naturally keep several pieces of game state,
+# including one list for short-lived visual particles.
+max-attributes=23
 # The Game class keeps its screen actions as small, readable methods.
 max-public-methods=40
 # Keyboard handling has one short branch for each visible menu action.

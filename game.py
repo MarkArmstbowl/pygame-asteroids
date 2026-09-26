@@ -7,11 +7,13 @@ import pygame
 
 from asteroid import Asteroid
 from bullet import Bullet
+from particle import Particle
 from player import Player
 from records import load_scores, save_score
 from settings import (
     BACKGROUND_BOTTOM,
     BACKGROUND_TOP,
+    ASTEROID_OUTLINE,
     CYAN,
     DARK_PANEL,
     ENABLE_TEST_WIN,
@@ -55,6 +57,7 @@ class Game:
         self.player = Player()
         self.asteroids = []
         self.bullets = []
+        self.particles = []
         self.state = "title"
         self.paused = False
         self.level_index = 0
@@ -207,6 +210,7 @@ class Game:
         """Reset all game data and begin at level one."""
         self.player = Player()
         self.bullets = []
+        self.particles = []
         self.score = 0
         self.lives = STARTING_LIVES
         self.level_index = 0
@@ -220,6 +224,7 @@ class Game:
         """Create the large asteroids for the current level."""
         self.asteroids = []
         self.bullets = []
+        self.particles = []
         level = LEVELS[self.level_index]
 
         for _ in range(level["asteroids"]):
@@ -266,11 +271,21 @@ class Game:
 
         keys = pygame.key.get_pressed()
         self.player.update(keys, delta_time, self.control_mode)
+        if self.player.thrusting:
+            self.add_thruster_particle()
 
         for bullet in self.bullets:
             bullet.update(delta_time)
+            self.add_bullet_trail(bullet)
         self.bullets = [
             bullet for bullet in self.bullets if bullet.is_alive()
+        ]
+
+        for particle in self.particles:
+            particle.update(delta_time)
+        self.particles = [
+            particle for particle in self.particles
+            if particle.is_alive()
         ]
 
         for asteroid in self.asteroids:
@@ -296,6 +311,15 @@ class Game:
                 )
 
                 if distance < asteroid.radius:
+                    particle_count = 8 + asteroid.size * 4
+                    particle_speed = 90 + asteroid.size * 35
+                    self.add_explosion(
+                        asteroid.x,
+                        asteroid.y,
+                        particle_count,
+                        particle_speed,
+                        ASTEROID_OUTLINE
+                    )
                     self.bullets.remove(bullet)
                     self.asteroids.remove(asteroid)
                     self.asteroids.extend(asteroid.split())
@@ -314,6 +338,13 @@ class Game:
             )
 
             if distance < PLAYER_RADIUS + asteroid.radius:
+                self.add_explosion(
+                    self.player.x,
+                    self.player.y,
+                    26,
+                    230,
+                    ORANGE
+                )
                 self.lives -= 1
                 if self.lives <= 0:
                     self.state = "game_over"
@@ -336,6 +367,60 @@ class Game:
         self.level_index = len(LEVELS) - 1
         self.asteroids = []
         self.finish_level()
+
+    def add_bullet_trail(self, bullet):
+        """Add a short cyan trail behind a moving bullet."""
+        particle = Particle(
+            (bullet.x, bullet.y),
+            (
+                -bullet.velocity_x * 0.04,
+                -bullet.velocity_y * 0.04
+            ),
+            CYAN,
+            3,
+            0.18
+        )
+        self.particles.append(particle)
+
+    def add_thruster_particle(self):
+        """Add one warm particle behind the player's engine."""
+        angle = math.radians(self.player.angle)
+        spread_angle = angle + random.uniform(-0.25, 0.25)
+        particle_speed = random.uniform(75, 145)
+        particle_x = self.player.x - math.sin(angle) * 18
+        particle_y = self.player.y + math.cos(angle) * 18
+        particle = Particle(
+            (particle_x, particle_y),
+            (
+                self.player.velocity_x
+                - math.sin(spread_angle) * particle_speed,
+                self.player.velocity_y
+                + math.cos(spread_angle) * particle_speed
+            ),
+            random.choice((ORANGE, PURPLE)),
+            random.uniform(2, 4),
+            random.uniform(0.25, 0.45)
+        )
+        self.particles.append(particle)
+
+    def add_explosion(
+            self, x_position, y_position, particle_count,
+            maximum_speed, color):
+        """Create a circular burst of particles at one position."""
+        for _ in range(particle_count):
+            direction = random.uniform(0, math.tau)
+            speed = random.uniform(maximum_speed * 0.35, maximum_speed)
+            particle = Particle(
+                (x_position, y_position),
+                (
+                    math.cos(direction) * speed,
+                    math.sin(direction) * speed
+                ),
+                color,
+                random.uniform(2, 5),
+                random.uniform(0.35, 0.75)
+            )
+            self.particles.append(particle)
 
     def record_current_score(self):
         """Save one completed run to the local leaderboard."""
@@ -364,6 +449,8 @@ class Game:
         """Draw all game objects and the heads-up display."""
         for asteroid in self.asteroids:
             asteroid.draw(self.screen)
+        for particle in self.particles:
+            particle.draw(self.screen)
         for bullet in self.bullets:
             bullet.draw(self.screen)
         self.player.draw(self.screen)

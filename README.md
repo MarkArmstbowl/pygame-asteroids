@@ -13,6 +13,7 @@ external art files are required.
 - Global score, three player lives, and temporary respawn protection
 - Victory, game-over, pause, and title screens
 - Pause-menu instructions, main-menu navigation, and local top-five scores
+- Particle explosions, engine exhaust, and glowing bullet trails
 - Real-time neon graphics, star field, and heads-up display
 
 ## Setup
