@@ -10,6 +10,7 @@ from bullet import Bullet
 from particle import Particle
 from player import Player
 from records import load_scores, save_score
+from sound import SoundManager
 from star import Star
 from settings import (
     ASTEROID_OUTLINE,
@@ -30,6 +31,8 @@ from settings import (
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
     SHOT_DELAY,
+    SOUND_ENABLED,
+    SOUND_VOLUME,
     STAR_LAYERS,
     STARTING_LIVES,
     WHITE,
@@ -41,6 +44,7 @@ class Game:
 
     def __init__(self):
         pygame.init()
+        self.sounds = SoundManager(SOUND_ENABLED, SOUND_VOLUME)
         self.screen = pygame.display.set_mode(
             (SCREEN_WIDTH, SCREEN_HEIGHT),
             pygame.SCALED
@@ -251,6 +255,7 @@ class Game:
 
         self.player.reset_position()
         self.level_message_timer = LEVEL_INTRO_TIME
+        self.sounds.play("level_start")
 
     def get_spawn_position(self):
         """Choose a position safely away from the player's ship."""
@@ -279,6 +284,7 @@ class Game:
         )
         self.bullets.append(bullet)
         self.player.start_shot_cooldown(SHOT_DELAY)
+        self.sounds.play("shoot")
 
     def update(self, delta_time):
         """Update moving objects and check the game rules."""
@@ -338,6 +344,9 @@ class Game:
                 )
 
                 if distance < asteroid.radius:
+                    self.sounds.play(
+                        "asteroid_" + str(asteroid.size)
+                    )
                     particle_count = 8 + asteroid.size * 4
                     particle_speed = 90 + asteroid.size * 35
                     self.add_explosion(
@@ -375,15 +384,18 @@ class Game:
                 )
                 self.lives -= 1
                 if self.lives <= 0:
+                    self.sounds.play("game_over")
                     self.state = "game_over"
                     self.record_current_score()
                 else:
+                    self.sounds.play("player_hit")
                     self.player.reset_position()
                 break
 
     def finish_level(self):
         """Advance to the next level or show the victory screen."""
         if self.level_index == len(LEVELS) - 1:
+            self.sounds.play("win")
             self.state = "win"
             self.record_current_score()
         else:

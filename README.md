@@ -16,6 +16,7 @@ external art files are required.
 - Particle explosions, engine exhaust, and glowing bullet trails
 - Layered moving stars, impact flashes, and subtle screen shake
 - Animated level introductions and detailed end-of-run summaries
+- Quiet original sound effects with a safe silent fallback
 - Real-time neon graphics, star field, and heads-up display
 
 ## Setup
@@ -59,9 +60,12 @@ game.py       Runs the game loop, levels, collisions, and screens
 player.py     Controls spaceship movement and drawing
 asteroid.py   Controls asteroid movement, shapes, and splitting
 bullet.py     Controls fired projectiles
+particle.py   Draws short-lived trails and explosion effects
 records.py    Stores and retrieves local high scores
 settings.py   Stores shared game settings and level difficulty
-assets/       Reserved for future sound or image files
+sound.py      Generates and safely plays the original sound effects
+star.py       Moves the layered background stars
+assets/       Reserved for future image files
 ```
 
 ## Level Progression

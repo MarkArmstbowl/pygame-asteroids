@@ -3,8 +3,8 @@ extension-pkg-allow-list=pygame
 
 [DESIGN]
 # Game controller objects naturally keep several pieces of game state,
-# including short-lived visual feedback and moving background stars.
-max-attributes=28
+# including visual feedback, moving stars, and optional sound effects.
+max-attributes=29
 # The Game class keeps its screen actions as small, readable methods.
 max-public-methods=40
 # Keyboard handling has one short branch for each visible menu action.

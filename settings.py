@@ -7,6 +7,10 @@ FPS = 60
 GAME_TITLE = "Neon Asteroids"
 LEVEL_INTRO_TIME = 2.2
 
+# Sounds are deliberately quiet and can be disabled without changing gameplay.
+SOUND_ENABLED = True
+SOUND_VOLUME = 0.22
+
 # Testing shortcut: press V during a game to skip the current level.
 # Change this to False before submitting the final version.
 ENABLE_TEST_LEVEL_SKIP = True
