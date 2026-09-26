@@ -6,6 +6,10 @@ SCREEN_HEIGHT = 700
 FPS = 60
 GAME_TITLE = "Neon Asteroids"
 
+# Testing shortcut: press V during a game to see the victory screen.
+# Change this to False before submitting the final version.
+ENABLE_TEST_WIN = True
+
 # Colors
 BACKGROUND_TOP = (4, 8, 22)
 BACKGROUND_BOTTOM = (10, 20, 45)
