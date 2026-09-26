@@ -8,4 +8,4 @@ max-attributes=29
 # The Game class keeps its screen actions as small, readable methods.
 max-public-methods=40
 # Keyboard handling has one short branch for each visible menu action.
-max-branches=20
+max-branches=21

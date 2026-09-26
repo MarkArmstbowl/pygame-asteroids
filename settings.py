@@ -10,6 +10,8 @@ LEVEL_INTRO_TIME = 2.2
 # Sounds are deliberately quiet and can be disabled without changing gameplay.
 SOUND_ENABLED = True
 SOUND_VOLUME = 0.22
+# Each level has its own quiet background-music volume.
+MUSIC_VOLUMES = [0.08, 0.07, 0.06]
 
 # Testing shortcut: press V during a game to skip the current level.
 # Change this to False before submitting the final version.

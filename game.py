@@ -24,6 +24,7 @@ from settings import (
     LEVELS,
     LEVEL_INTRO_TIME,
     LIGHT_BLUE,
+    MUSIC_VOLUMES,
     ORANGE,
     PLAYER_RADIUS,
     PURPLE,
@@ -44,7 +45,9 @@ class Game:
 
     def __init__(self):
         pygame.init()
-        self.sounds = SoundManager(SOUND_ENABLED, SOUND_VOLUME)
+        self.sounds = SoundManager(
+            SOUND_ENABLED, SOUND_VOLUME, MUSIC_VOLUMES
+        )
         self.screen = pygame.display.set_mode(
             (SCREEN_WIDTH, SCREEN_HEIGHT),
             pygame.SCALED
@@ -154,6 +157,10 @@ class Game:
                     self.handle_confirmation_key(event.key)
                     continue
 
+                if event.key == pygame.K_n:
+                    self.sounds.toggle()
+                    continue
+
                 if self.state == "title":
                     if event.key == pygame.K_RETURN:
                         self.start_game()
@@ -221,6 +228,7 @@ class Game:
 
     def return_to_menu(self):
         """Leave the current run and return to the title screen."""
+        self.sounds.play_music(0)
         self.state = "title"
         self.paused = False
         self.confirm_action = None
@@ -255,6 +263,7 @@ class Game:
 
         self.player.reset_position()
         self.level_message_timer = LEVEL_INTRO_TIME
+        self.sounds.play_music(self.level_index)
         self.sounds.play("level_start")
 
     def get_spawn_position(self):
@@ -384,6 +393,7 @@ class Game:
                 )
                 self.lives -= 1
                 if self.lives <= 0:
+                    self.sounds.stop_music()
                     self.sounds.play("game_over")
                     self.state = "game_over"
                     self.record_current_score()
@@ -396,6 +406,7 @@ class Game:
         """Advance to the next level or show the victory screen."""
         if self.level_index == len(LEVELS) - 1:
             self.sounds.play("win")
+            self.sounds.soften_music()
             self.state = "win"
             self.record_current_score()
         else:
@@ -565,6 +576,11 @@ class Game:
         pause_surface = self.small_font.render(
             "P / ESC  PAUSE", True, LIGHT_BLUE
         )
+        sound_surface = self.small_font.render(
+            "N  " + self._sound_status_text(),
+            True,
+            LIGHT_BLUE
+        )
         right_edge = SCREEN_WIDTH - 24
         self.screen.blit(
             mode_surface,
@@ -573,6 +589,10 @@ class Game:
         self.screen.blit(
             pause_surface,
             (right_edge - pause_surface.get_width(), 47)
+        )
+        self.screen.blit(
+            sound_surface,
+            (right_edge - sound_surface.get_width(), 74)
         )
 
     def draw_title_screen(self):
@@ -616,11 +636,12 @@ class Game:
             ORANGE,
             607
         )
-        self.draw_centered_text(
-            "ESC quits from this menu",
-            self.small_font,
-            LIGHT_BLUE,
-            657
+        self.draw_shortcut(
+            "N", self._sound_status_text(), 385, 657,
+            LIGHT_BLUE
+        )
+        self.draw_shortcut(
+            "ESC", "QUIT", 625, 657, LIGHT_BLUE
         )
 
     def draw_pause_screen(self):
@@ -650,11 +671,15 @@ class Game:
             "C", "SWITCH MODE", panel.centerx + 180, 477
         )
         self.draw_shortcut(
-            "M", "MAIN MENU", panel.centerx - 180, 535,
+            "M", "MAIN MENU", panel.centerx - 240, 535,
             LIGHT_BLUE
         )
         self.draw_shortcut(
-            "Q", "QUIT", panel.centerx + 180, 535,
+            "N", self._sound_status_text(), panel.centerx, 535,
+            LIGHT_BLUE
+        )
+        self.draw_shortcut(
+            "Q", "QUIT", panel.centerx + 240, 535,
             LIGHT_BLUE
         )
 
@@ -749,6 +774,16 @@ class Game:
             "M", "MAIN MENU", panel.centerx + 175, 475,
             LIGHT_BLUE
         )
+        self.draw_shortcut(
+            "N", self._sound_status_text(), panel.centerx, 525,
+            LIGHT_BLUE
+        )
+
+    def _sound_status_text(self):
+        """Return the short sound label used by menus and the HUD."""
+        if self.sounds.is_sound_on():
+            return "SOUND ON"
+        return "SOUND OFF"
 
     def _draw_level_intro(self):
         """Draw a fading information card at the start of each level."""
