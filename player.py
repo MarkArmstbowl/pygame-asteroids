@@ -21,7 +21,7 @@ from settings import (
 
 
 class Player:
-    """A spaceship controlled with the keyboard arrow keys."""
+    """A spaceship controlled with arrows or WASD."""
 
     def __init__(self):
         self.x = SCREEN_WIDTH / 2
@@ -34,7 +34,7 @@ class Player:
         self.invulnerable_timer = 0
 
     def reset_position(self):
-        """Move the ship to the center after losing a life."""
+        """Put the ship in the center with a short time of protection."""
         self.x = SCREEN_WIDTH / 2
         self.y = SCREEN_HEIGHT / 2
         self.velocity_x = 0
@@ -43,18 +43,19 @@ class Player:
         self.invulnerable_timer = PLAYER_INVULNERABLE_TIME
 
     def update(self, keys, delta_time, control_mode="classic"):
-        """Turn, accelerate, and move the spaceship."""
+        """Read the controls and move the ship."""
         if control_mode == "direct":
             self.update_direct_controls(keys, delta_time)
         else:
             self.update_classic_controls(keys, delta_time)
 
-        # Drag slows the ship gently when the engine is not accelerating it.
+        # Slow the ship a little each frame, even while thrusting.
         drag = PLAYER_DRAG ** (delta_time * 60)
         self.velocity_x *= drag
         self.velocity_y *= drag
         self.limit_speed()
 
+        # Use the frame time so movement does not depend on the frame rate.
         self.x += self.velocity_x * delta_time
         self.y += self.velocity_y * delta_time
         self.wrap_around_screen()
@@ -65,7 +66,8 @@ class Player:
         )
 
     def update_classic_controls(self, keys, delta_time):
-        """Use arrows or WASD to rotate, thrust, and brake."""
+        """Use arrows or WASD to turn, move forward, and brake."""
+        # Left and right turn the ship without changing its speed.
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             self.angle -= PLAYER_TURN_SPEED * delta_time
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
@@ -73,6 +75,7 @@ class Player:
 
         self.thrusting = keys[pygame.K_UP] or keys[pygame.K_w]
         if self.thrusting:
+            # Sine and cosine split the forward push into x and y parts.
             angle_radians = math.radians(self.angle)
             self.velocity_x += (
                 math.sin(angle_radians) * PLAYER_THRUST * delta_time
@@ -87,10 +90,11 @@ class Player:
             self.velocity_y *= brake_amount
 
     def update_direct_controls(self, keys, delta_time):
-        """Use WASD to point and move in screen directions."""
+        """Use arrows or WASD to move in screen directions."""
         direction_x = 0
         direction_y = 0
 
+        # On the screen, smaller y values mean moving up.
         if keys[pygame.K_w] or keys[pygame.K_UP]:
             direction_y -= 1
         if keys[pygame.K_s] or keys[pygame.K_DOWN]:
@@ -104,7 +108,7 @@ class Player:
         if not self.thrusting:
             return
 
-        # Normalize diagonal input so it is not faster than one direction.
+        # Keep diagonal movement as fast as moving straight.
         direction_length = math.hypot(direction_x, direction_y)
         direction_x /= direction_length
         direction_y /= direction_length
@@ -114,12 +118,13 @@ class Player:
         )
         self.turn_toward(target_angle, delta_time)
 
-        # Movement responds immediately while the ship turns to face it.
+        # Start moving right away, while the ship turns toward the input.
         self.velocity_x += direction_x * PLAYER_THRUST * delta_time
         self.velocity_y += direction_y * PLAYER_THRUST * delta_time
 
     def turn_toward(self, target_angle, delta_time):
-        """Rotate toward a target using the shortest direction."""
+        """Turn toward the chosen angle by the shortest path."""
+        # Keep the angle difference between -180 and 180 degrees.
         difference = (target_angle - self.angle + 180) % 360 - 180
         turn_amount = DIRECT_TURN_SPEED * delta_time
 
@@ -133,7 +138,7 @@ class Player:
         self.angle %= 360
 
     def limit_speed(self):
-        """Keep the spaceship from moving too quickly."""
+        """Keep the ship from going over its speed limit."""
         speed = math.hypot(self.velocity_x, self.velocity_y)
         if speed > PLAYER_MAX_SPEED:
             scale = PLAYER_MAX_SPEED / speed
@@ -153,22 +158,22 @@ class Player:
             self.y = 0
 
     def can_shoot(self):
-        """Return True when the shot cooldown has finished."""
+        """Check whether the ship can fire another bullet."""
         return self.shot_timer == 0
 
     def start_shot_cooldown(self, delay):
-        """Prevent another shot until the delay has passed."""
+        """Set the wait time before the next shot."""
         self.shot_timer = delay
 
     def get_nose_position(self):
-        """Return the front point of the spaceship."""
+        """Find the front of the ship, where bullets start."""
         angle_radians = math.radians(self.angle)
         nose_x = self.x + math.sin(angle_radians) * 22
         nose_y = self.y - math.cos(angle_radians) * 22
         return nose_x, nose_y
 
     def rotate_points(self, points):
-        """Rotate local drawing points around the ship's center."""
+        """Turn the ship's drawing points and place them on the screen."""
         angle_radians = math.radians(self.angle)
         cosine = math.cos(angle_radians)
         sine = math.sin(angle_radians)
@@ -183,7 +188,7 @@ class Player:
 
     def draw(self, screen):
         """Draw the spaceship and its engine flame."""
-        # Blink briefly after the player loses a life.
+        # Blink while the ship is protected after a reset.
         if self.invulnerable_timer > 0:
             if int(self.invulnerable_timer * 10) % 2 == 0:
                 return
@@ -196,7 +201,7 @@ class Player:
             2
         )
 
-        # The inner line gives the ship a small neon cockpit.
+        # Draw a small cockpit inside the ship.
         cockpit_points = [(-5, 7), (0, -7), (5, 7)]
         pygame.draw.lines(
             screen,

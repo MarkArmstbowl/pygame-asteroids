@@ -15,11 +15,12 @@ from settings import (
 
 
 class Bullet:
-    """A small projectile that travels in a straight line."""
+    """A bullet that moves straight ahead until its time runs out."""
 
     def __init__(self, x, y, angle, ship_velocity_x, ship_velocity_y):
         self.x = x
         self.y = y
+        # Aim along the ship's angle and add the ship's current movement.
         angle_radians = math.radians(angle)
         self.velocity_x = (
             math.sin(angle_radians) * BULLET_SPEED + ship_velocity_x
@@ -30,17 +31,17 @@ class Bullet:
         self.life_remaining = BULLET_LIFETIME
 
     def update(self, delta_time):
-        """Move the bullet, wrap it, and reduce its remaining lifetime."""
+        """Move the bullet and reduce the time it has left."""
         self.x += self.velocity_x * delta_time
         self.y += self.velocity_y * delta_time
         self.life_remaining -= delta_time
 
-        # Classic Asteroids objects reappear at the opposite screen edge.
+        # Reappear on the other side after crossing a screen edge.
         self.x %= SCREEN_WIDTH
         self.y %= SCREEN_HEIGHT
 
     def is_alive(self):
-        """Return True until the bullet's short lifetime ends."""
+        """Check whether the bullet still has time left."""
         return self.life_remaining > 0
 
     def draw(self, screen):

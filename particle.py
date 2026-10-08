@@ -1,4 +1,4 @@
-"""Small visual particles used for trails and explosions."""
+"""Small moving dots for trails and explosions."""
 
 import pygame
 
@@ -15,21 +15,23 @@ class Particle:
         self.starting_life = lifetime
 
     def update(self, delta_time):
-        """Move the particle and reduce its remaining lifetime."""
+        """Move the dot and count down its remaining time."""
         self.x += self.velocity_x * delta_time
         self.y += self.velocity_y * delta_time
         self.life_remaining -= delta_time
 
+        # Slow the dot down a little as it moves.
         drag = 0.97 ** (delta_time * 60)
         self.velocity_x *= drag
         self.velocity_y *= drag
 
     def is_alive(self):
-        """Return True while the particle should remain visible."""
+        """Check whether the dot still has time left."""
         return self.life_remaining > 0
 
     def draw(self, screen):
-        """Draw a smaller and dimmer dot near the end of its life."""
+        """Make the dot smaller and dimmer as its time runs out."""
+        # Use the time left to work out its color and size.
         life_amount = max(0, self.life_remaining / self.starting_life)
         faded_color = tuple(
             round(color_value * life_amount)

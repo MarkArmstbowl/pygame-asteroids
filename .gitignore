@@ -7,14 +7,14 @@ __pycache__/
 venv/
 env/
 
-# Editor and operating system files
+# Files from the editor or operating system
 .DS_Store
 .idea/
 .vscode/
 
-# Test and lint caches
+# Cache files from tests and Pylint
 .pytest_cache/
 .pylint.d/
 
-# Local player data
+# Scores saved while playing on this computer
 records.json

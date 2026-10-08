@@ -6,7 +6,7 @@ from settings import SCREEN_HEIGHT, SCREEN_WIDTH
 
 
 class Star:
-    """A background star that drifts and wraps around the screen."""
+    """A background star that moves slowly across the screen."""
 
     def __init__(self, x_position, y_position, speed, radius, brightness):
         self.x = x_position
@@ -20,6 +20,7 @@ class Star:
         self.x -= self.speed * 0.12 * delta_time
         self.y += self.speed * delta_time
 
+        # Bring the star back on the opposite side when it leaves the screen.
         if self.y > SCREEN_HEIGHT:
             self.y = 0
         if self.x < 0:

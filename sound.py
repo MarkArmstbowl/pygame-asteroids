@@ -1,4 +1,4 @@
-"""Play generated sound effects and bundled background music."""
+"""Make the sound effects and play music from the music folder."""
 
 import math
 import os
@@ -8,7 +8,7 @@ import pygame
 
 
 class SoundManager:
-    """Manage generated sound effects and bundled background music."""
+    """Keep the music, sound effects, and sound switch together."""
 
     SAMPLE_RATE = 44100
 
@@ -21,6 +21,7 @@ class SoundManager:
         self.music_volumes = [
             max(0, min(1, volume)) for volume in music_volumes
         ]
+        # Use this file's folder to find assets/music.
         music_directory = os.path.join(
             os.path.dirname(__file__), "assets", "music"
         )
@@ -34,13 +35,14 @@ class SoundManager:
             return
 
         try:
-            # One channel is enough for these short generated sounds.
+            # Use the same sound format as the samples made below.
             pygame.mixer.quit()
             pygame.mixer.init(
                 frequency=self.SAMPLE_RATE,
                 size=-16,
                 channels=2,
-                buffer=512
+                buffer=512,
+                allowedchanges=0
             )
             self.sounds = {
                 "shoot": self._make_sweep(720, 440, 0.07, 0.28),
@@ -57,12 +59,12 @@ class SoundManager:
             self.muted = False
             self.play_music(0)
         except (pygame.error, ValueError):
-            # The game remains fully playable without an audio device.
+            # Keep playing the game if this computer cannot play sounds.
             self.sounds = {}
 
     def _make_sweep(
             self, start_frequency, end_frequency, duration, strength):
-        """Create one fading tone that moves between two frequencies."""
+        """Make a short sound whose pitch changes as it plays."""
         sample_count = round(self.SAMPLE_RATE * duration)
         sound_data = bytearray()
         phase = 0
@@ -75,16 +77,18 @@ class SoundManager:
             )
             phase += math.tau * frequency / self.SAMPLE_RATE
 
+            # Start softly, then lower the volume as the sound ends.
             fade_out = (1 - progress) ** 2
             fade_in = min(1, index / (self.SAMPLE_RATE * 0.008))
             sample = math.sin(phase) * fade_in * fade_out * strength
             sample_value = round(sample * 32767)
+            # Write each sample twice, once for the left and right speakers.
             sound_data.extend(struct.pack("<hh", sample_value, sample_value))
 
         return pygame.mixer.Sound(buffer=bytes(sound_data))
 
     def _make_death_sound(self):
-        """Create a longer falling arcade sound for game over."""
+        """Make a falling-pitch sound for losing the last life."""
         duration = 0.9
         sample_count = round(self.SAMPLE_RATE * duration)
         sound_data = bytearray()
@@ -92,6 +96,7 @@ class SoundManager:
 
         for index in range(sample_count):
             progress = index / sample_count
+            # Add a little wobble while the pitch falls.
             wobble = math.sin(progress * math.tau * 9) * 32
             frequency = 460 - (380 * progress) + wobble
             phase += math.tau * frequency / self.SAMPLE_RATE
@@ -105,13 +110,13 @@ class SoundManager:
         return pygame.mixer.Sound(buffer=bytes(sound_data))
 
     def set_effects_volume(self, volume):
-        """Set one quiet master volume for every generated sound."""
+        """Set the same volume for all sound effects."""
         safe_volume = max(0, min(1, volume))
         for sound in self.sounds.values():
             sound.set_volume(safe_volume)
 
     def play_music(self, track_index):
-        """Switch to the looping music selected for one game level."""
+        """Play the music for this level and repeat it."""
         if not self.enabled:
             return
 
@@ -119,6 +124,7 @@ class SoundManager:
         target_volume = self.music_volumes[safe_index]
 
         try:
+            # Do not restart a track that is already playing.
             if (
                     safe_index == self.current_track
                     and self.music_loaded
@@ -127,6 +133,7 @@ class SoundManager:
                 pygame.mixer.music.set_volume(volume)
                 return
 
+            # Load the new track and raise its volume over 800 milliseconds.
             pygame.mixer.music.load(self.music_paths[safe_index])
             pygame.mixer.music.set_volume(
                 0 if self.muted else target_volume
@@ -135,10 +142,11 @@ class SoundManager:
             self.current_track = safe_index
             self.music_loaded = True
         except (pygame.error, OSError):
+            # A missing music file should not stop the game.
             self.music_loaded = False
 
     def soften_music(self):
-        """Lower the music behind the victory screen."""
+        """Make the music quieter on the victory screen."""
         if self.enabled and self.music_loaded:
             try:
                 if not self.muted:
@@ -150,7 +158,7 @@ class SoundManager:
                 self.music_loaded = False
 
     def stop_music(self):
-        """Stop the current background track until music starts again."""
+        """Stop the music until another track is started."""
         if not self.enabled:
             return
 
@@ -170,9 +178,11 @@ class SoundManager:
         self.muted = not self.muted
         try:
             if self.muted:
+                # Stop current effects and silence the music.
                 pygame.mixer.stop()
                 pygame.mixer.music.set_volume(0)
             elif self.music_loaded:
+                # Bring back the volume for the current level.
                 pygame.mixer.music.set_volume(
                     self.music_volumes[self.current_track]
                 )
@@ -183,11 +193,11 @@ class SoundManager:
         return not self.muted
 
     def is_sound_on(self):
-        """Return True when audio is available and not muted."""
+        """Check whether sound is working and switched on."""
         return self.enabled and not self.muted
 
     def play(self, sound_name):
-        """Play a sound when audio is available on this computer."""
+        """Play a named effect if sound is switched on."""
         if (
                 not self.enabled
                 or self.muted

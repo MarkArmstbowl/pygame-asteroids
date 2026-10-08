@@ -14,8 +14,9 @@ from settings import (
 
 
 class Asteroid:
-    """An irregular asteroid with its own movement direction."""
+    """A rock with its own shape, speed, and direction."""
 
+    # Size 3 is large, size 2 is medium, and size 1 is small.
     RADII = {3: 48, 2: 31, 1: 18}
 
     def __init__(self, x, y, speed, size=3, direction=None):
@@ -24,6 +25,7 @@ class Asteroid:
         self.size = size
         self.radius = self.RADII[size]
 
+        # New rocks get a random direction; fragments use their given one.
         if direction is None:
             direction = random.uniform(0, math.tau)
 
@@ -34,7 +36,7 @@ class Asteroid:
         self.shape = self.make_shape()
 
     def make_shape(self):
-        """Create uneven points around the asteroid's edge."""
+        """Make uneven points around the rock's edge."""
         points = []
         point_count = random.randint(9, 12)
 
@@ -46,7 +48,7 @@ class Asteroid:
         return points
 
     def update(self, delta_time):
-        """Move, rotate, and wrap the asteroid around the screen."""
+        """Move and rotate the rock, then check the screen edges."""
         self.x += self.velocity_x * delta_time
         self.y += self.velocity_y * delta_time
         self.rotation += self.rotation_speed * delta_time
@@ -54,6 +56,7 @@ class Asteroid:
 
     def wrap_around_screen(self):
         """Move the asteroid to the opposite edge of the screen."""
+        # Allow extra space beyond each edge based on the rock's radius.
         margin = self.radius
 
         if self.x < -margin:
@@ -67,7 +70,7 @@ class Asteroid:
             self.y = -margin
 
     def get_draw_points(self):
-        """Return the asteroid points after applying its rotation."""
+        """Find the rock's screen points after rotating it."""
         rotation_radians = math.radians(self.rotation)
         draw_points = []
 
@@ -80,7 +83,8 @@ class Asteroid:
         return draw_points
 
     def split(self):
-        """Break a large asteroid into two faster, smaller asteroids."""
+        """Split a large or medium rock into two smaller rocks."""
+        # Small rocks disappear instead of splitting again.
         if self.size == 1:
             return []
 
@@ -88,6 +92,7 @@ class Asteroid:
         current_speed = math.hypot(self.velocity_x, self.velocity_y)
         fragments = []
 
+        # Send the two faster fragments in slightly different directions.
         for angle_change in (-0.65, 0.65):
             fragment = Asteroid(
                 self.x,
@@ -101,7 +106,7 @@ class Asteroid:
         return fragments
 
     def draw(self, screen):
-        """Draw the filled rock and its bright outline."""
+        """Draw the rock with a fill color and an outline."""
         points = self.get_draw_points()
         pygame.draw.polygon(screen, ASTEROID_FILL, points)
         pygame.draw.polygon(screen, ASTEROID_OUTLINE, points, 2)

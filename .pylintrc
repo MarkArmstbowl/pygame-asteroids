@@ -1,11 +1,11 @@
 [MAIN]
+# Help Pylint recognize functions provided by Pygame.
 extension-pkg-allow-list=pygame
 
 [DESIGN]
-# Game controller objects naturally keep several pieces of game state,
-# including visual feedback, moving stars, and optional sound effects.
+# Game objects need values for movement, timers, scores, and other settings.
 max-attributes=29
-# The Game class keeps its screen actions as small, readable methods.
+# Game uses separate methods for input, rules, and screen drawing.
 max-public-methods=40
-# Keyboard handling has one short branch for each visible menu action.
+# The key handler has a branch for each screen and menu action.
 max-branches=21

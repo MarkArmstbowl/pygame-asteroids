@@ -1,4 +1,4 @@
-"""Load and save the local Asteroids high-score list."""
+"""Read and save the five highest scores in records.json."""
 
 import json
 import os
@@ -9,27 +9,30 @@ MAX_RECORDS = 5
 
 
 def load_scores():
-    """Return saved scores, or an empty list when no records exist."""
+    """Read saved scores, or start with an empty list."""
     try:
         with open(RECORD_FILE, encoding="utf-8") as record_file:
             scores = json.load(record_file)
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        # Start with no scores if the file is missing or cannot be read.
         return []
 
     if not isinstance(scores, list):
         return []
 
+    # Keep only whole numbers that are zero or higher.
     valid_scores = []
     for score in scores:
         if isinstance(score, int) and score >= 0:
             valid_scores.append(score)
 
+    # Put the highest scores first and keep only five.
     valid_scores.sort(reverse=True)
     return valid_scores[:MAX_RECORDS]
 
 
 def save_score(new_score):
-    """Add one score and return the updated top-five list."""
+    """Add a score, save the best five, and return the list."""
     scores = load_scores()
 
     if isinstance(new_score, int) and new_score >= 0:
@@ -38,10 +41,11 @@ def save_score(new_score):
         scores = scores[:MAX_RECORDS]
 
         try:
+            # Writing creates records.json the first time a score is saved.
             with open(RECORD_FILE, "w", encoding="utf-8") as record_file:
                 json.dump(scores, record_file, indent=2)
         except OSError:
-            # The game can continue even if local records cannot be saved.
+            # Keep playing if the folder does not allow saving the file.
             pass
 
     return scores
